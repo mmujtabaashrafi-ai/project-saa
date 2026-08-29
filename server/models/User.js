@@ -53,6 +53,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    savedPosts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post',
+      },
+    ],
+    website: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Sparkles, Lock, User, AlertCircle, Loader2, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import LoginSuccessCinematic from '../components/LoginSuccessCinematic';
 
 // ─── Floating aesthetic sparkles & petals ──────────────────────────────────
 const FloatingOrb = ({ style }) => (
@@ -57,6 +58,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   const displayError = formError || error;
 
@@ -86,11 +88,16 @@ export default function LoginPage() {
     setSubmitting(false);
 
     if (result.success) {
-      navigate('/chat', { replace: true });
+      // Trigger cinematic princess login-success experience
+      setLoginSuccess(true);
     } else {
       setFormError(result.message || 'Invalid username or password. Please try again.');
     }
   };
+
+  if (loginSuccess) {
+    return <LoginSuccessCinematic onComplete={() => navigate('/home', { replace: true })} />;
+  }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#070913] text-white">

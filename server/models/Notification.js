@@ -10,8 +10,8 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['message', 'system', 'admin'],
-      default: 'message',
+      enum: ['message', 'system', 'admin', 'like', 'comment', 'mention', 'story', 'call', 'ai'],
+      default: 'system',
     },
     title: {
       type: String,
@@ -31,6 +31,16 @@ const notificationSchema = new mongoose.Schema(
       ref: 'Conversation',
       default: null,
     },
+    relatedPost: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Post',
+      default: null,
+    },
+    relatedReel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Reel',
+      default: null,
+    },
     isRead: {
       type: Boolean,
       default: false,
@@ -39,4 +49,7 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+notificationSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Notification', notificationSchema);
+

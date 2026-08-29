@@ -9,12 +9,21 @@ const connectDB = require('./config/db');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const initSocketHandler = require('./sockets/socketHandler');
 
+const path = require('path');
+
 // ─── Route Imports ─────────────────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const conversationRoutes = require('./routes/conversations');
 const messageRoutes = require('./routes/messages');
 const reactBoatRoutes = require('./routes/reactBoat');
+const aiRoutes = require('./routes/ai');
+const postRoutes = require('./routes/posts');
+const storyRoutes = require('./routes/stories');
+const reelRoutes = require('./routes/reels');
+const mediaRoutes = require('./routes/media');
+const notificationRoutes = require('./routes/notifications');
+const searchRoutes = require('./routes/search');
 const adminRoutes = require('./routes/admin');
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
@@ -50,9 +59,12 @@ app.use(
 );
 
 // ─── Body Parsing ────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
+
+// ─── Static Uploads ──────────────────────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ─── Rate Limiting ───────────────────────────────────────────────────────────
 app.use('/api/', generalLimiter);
@@ -62,7 +74,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
-app.use('/api/react-boat', reactBoatRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/stories', storyRoutes);
+app.use('/api/reels', reelRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/react-boat', reactBoatRoutes); // Backwards compatibility
 app.use('/api/admin', adminRoutes);
 
 // ─── Health Check ────────────────────────────────────────────────────────────

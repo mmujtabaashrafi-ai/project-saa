@@ -20,10 +20,45 @@ const messageSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 5000,
+      default: '',
     },
+    mediaUrl: {
+      type: String,
+      default: null,
+    },
+    mediaType: {
+      type: String,
+      enum: ['image', 'video', 'audio', 'file', null],
+      default: null,
+    },
+    fileName: {
+      type: String,
+      default: null,
+    },
+    fileSize: {
+      type: Number,
+      default: null,
+    },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
     status: {
       type: String,
       enum: ['sent', 'delivered', 'read'],
@@ -37,6 +72,18 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
+      type: Date,
+      default: null,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
@@ -44,3 +91,4 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ conversationId: 1, createdAt: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);
+

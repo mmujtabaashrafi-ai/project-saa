@@ -3,10 +3,11 @@ const User = require('../models/User');
 const Session = require('../models/Session');
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
+const Call = require('../models/Call');
 
 /**
  * Authenticated Socket.IO handler.
- * Sockets must authenticate via JWT token in the handshake.
+ * Sockets authenticate via JWT token in the handshake.
  */
 const initSocketHandler = (io) => {
   // ─── Authentication Middleware ───────────────────────────────────────────
@@ -45,7 +46,7 @@ const initSocketHandler = (io) => {
     const userId = socket.userId;
     console.log(`🔌 Socket connected: ${socket.user.displayName} [${socket.id}]`);
 
-    // Join personal room for direct messages and notifications
+    // Join personal room for direct messages, notifications, and WebRTC calls
     socket.join(`user:${userId}`);
 
     // Update user online status
@@ -62,12 +63,21 @@ const initSocketHandler = (io) => {
       avatar: socket.user.avatar,
     });
 
-    // ─── Message: Send ─────────────────────────────────────────────────
+    // ─── Message: Send (Text or Media) ──────────────────────────────────
     socket.on('message:send', async (data, callback) => {
       try {
-        const { conversationId, text, receiverId } = data;
+        const {
+          conversationId,
+          text,
+          receiverId,
+          mediaUrl,
+          mediaType,
+          fileName,
+          fileSize,
+          replyTo,
+        } = data;
 
-        if (!conversationId || !text?.trim()) {
+        if (!conversationId || (!text?.trim() && !mediaUrl)) {
           return callback?.({ error: 'Invalid message data' });
         }
 
@@ -86,18 +96,24 @@ const initSocketHandler = (io) => {
           conversationId,
           sender: userId,
           receiver: receiverId || null,
-          text: text.trim(),
+          text: (text || '').trim(),
+          mediaUrl: mediaUrl || null,
+          mediaType: mediaType || null,
+          fileName: fileName || null,
+          fileSize: fileSize || null,
+          replyTo: replyTo || null,
           status: 'sent',
         });
 
-        const populated = await Message.findById(message._id).populate(
-          'sender',
-          'username displayName avatar'
-        );
+        const populated = await Message.findById(message._id)
+          .populate('sender', 'username displayName avatar role')
+          .populate('replyTo', 'text mediaUrl mediaType sender');
+
+        const previewText = (text || '').trim() || `[${mediaType || 'Media'}]`;
 
         // Update conversation
         await Conversation.findByIdAndUpdate(conversationId, {
-          lastMessage: { text: text.trim(), sender: userId, timestamp: new Date() },
+          lastMessage: { text: previewText, sender: userId, timestamp: new Date() },
           updatedAt: new Date(),
         });
 
@@ -144,7 +160,7 @@ const initSocketHandler = (io) => {
       }
     });
 
-    // ─── Typing: Start ──────────────────────────────────────────────────
+    // ─── Typing: Start / Stop ───────────────────────────────────────────
     socket.on('typing:start', (data) => {
       const { receiverId, conversationId } = data;
       if (receiverId) {
@@ -156,7 +172,6 @@ const initSocketHandler = (io) => {
       }
     });
 
-    // ─── Typing: Stop ───────────────────────────────────────────────────
     socket.on('typing:stop', (data) => {
       const { receiverId, conversationId } = data;
       if (receiverId) {
@@ -164,6 +179,107 @@ const initSocketHandler = (io) => {
           userId,
           conversationId,
         });
+      }
+    });
+
+    // ─── WebRTC Call Signaling (Audio & Video) ───────────────────────────
+    socket.on('call:initiate', async (data, callback) => {
+      try {
+        const { receiverId, type } = data; // type: 'audio' | 'video'
+
+        if (!receiverId) return callback?.({ error: 'Receiver ID required' });
+
+        // Check if receiver is online
+        const receiverSockets = await io.in(`user:${receiverId}`).fetchSockets();
+        if (receiverSockets.length === 0) {
+          // Log missed call
+          await Call.create({
+            caller: userId,
+            receiver: receiverId,
+            type: type || 'audio',
+            status: 'missed',
+          });
+          return callback?.({ error: 'User is offline', isOffline: true });
+        }
+
+        // Create active Call record
+        const callDoc = await Call.create({
+          caller: userId,
+          receiver: receiverId,
+          type: type || 'audio',
+          status: 'completed',
+          startedAt: new Date(),
+        });
+
+        // Ring the receiver
+        io.to(`user:${receiverId}`).emit('call:incoming', {
+          callId: callDoc._id,
+          caller: {
+            _id: socket.user._id,
+            username: socket.user.username,
+            displayName: socket.user.displayName,
+            avatar: socket.user.avatar,
+          },
+          type: type || 'audio',
+        });
+
+        callback?.({ success: true, callId: callDoc._id });
+      } catch (err) {
+        console.error('[Socket call:initiate]', err.message);
+        callback?.({ error: 'Call failed to initiate' });
+      }
+    });
+
+    // Accept call
+    socket.on('call:accept', (data) => {
+      const { callerId, callId } = data;
+      if (callerId) {
+        io.to(`user:${callerId}`).emit('call:accepted', {
+          callId,
+          receiver: {
+            _id: socket.user._id,
+            username: socket.user.username,
+            displayName: socket.user.displayName,
+            avatar: socket.user.avatar,
+          },
+        });
+      }
+    });
+
+    // Reject call
+    socket.on('call:reject', async (data) => {
+      const { callerId, callId } = data;
+      if (callId) {
+        await Call.findByIdAndUpdate(callId, { status: 'rejected' }).catch(() => {});
+      }
+      if (callerId) {
+        io.to(`user:${callerId}`).emit('call:rejected', { callId });
+      }
+    });
+
+    // Exchange WebRTC Signals (Offer, Answer, ICE Candidates)
+    socket.on('call:signal', (data) => {
+      const { targetUserId, signal, callId } = data;
+      if (targetUserId) {
+        io.to(`user:${targetUserId}`).emit('call:signal', {
+          senderId: userId,
+          signal,
+          callId,
+        });
+      }
+    });
+
+    // End call
+    socket.on('call:end', async (data) => {
+      const { targetUserId, callId, duration } = data;
+      if (callId) {
+        await Call.findByIdAndUpdate(callId, {
+          endedAt: new Date(),
+          duration: duration || 0,
+        }).catch(() => {});
+      }
+      if (targetUserId) {
+        io.to(`user:${targetUserId}`).emit('call:ended', { callId });
       }
     });
 

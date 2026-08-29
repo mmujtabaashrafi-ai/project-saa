@@ -15,13 +15,18 @@ export default function UserAvatar({
   isOnline = false,
   className = '',
 }) {
-  const isSaba = user?.username === 'saba.the.purest.women';
+  const isSaba =
+    user?.username === 'saba.the.purest.women' ||
+    user?.isSabaAI ||
+    user?.username?.toLowerCase().includes('saba') ||
+    user?.displayName?.toLowerCase().includes('saba');
   const isAdmin = user?.role === 'admin';
 
-  // Use DiceBear avatar or provided avatar
-  const avatarSrc =
-    user?.avatar ||
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.username || 'default')}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+  // Use princess image for Saba or user's custom avatar or DiceBear avatar
+  const avatarSrc = isSaba
+    ? '/saba_bg.jpg'
+    : user?.avatar ||
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.username || 'default')}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
 
   const fontSize = size * 0.4;
   const statusSize = Math.max(10, size * 0.28);

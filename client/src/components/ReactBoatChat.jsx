@@ -138,11 +138,19 @@ export default function ReactBoatChat() {
 
     try {
       const { data } = await reactBoatApi.chat(trimmed);
-      if (data.success) {
+      if (data && data.success) {
+        const responseText =
+          data.response ||
+          (typeof data.message === 'string' ? data.message : data.message?.content) ||
+          data.assistantMessage?.content ||
+          'I am here to assist you!';
+
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: data.response, timestamp: new Date() },
+          { role: 'assistant', content: responseText, timestamp: new Date() },
         ]);
+      } else {
+        throw new Error(data?.message || 'Failed to get response');
       }
     } catch (err) {
       setMessages((prev) => [

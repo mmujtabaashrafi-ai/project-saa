@@ -25,7 +25,10 @@ const getQuote = (username) => {
 export default function ProfileModal({ user, onClose, onMessage }) {
   const { onlineUsers } = useSocket();
   const isOnline = user ? onlineUsers.has(user._id) : false;
-  const isSaba = user?.username === SABA_USERNAME;
+  const isSaba =
+    user?.username === 'saba' ||
+    user?.username === 'saba.the.purest.women' ||
+    user?.username?.toLowerCase().includes('saba');
 
   const lastSeenText = user?.lastSeen
     ? formatDistanceToNow(new Date(user.lastSeen), { addSuffix: true })
