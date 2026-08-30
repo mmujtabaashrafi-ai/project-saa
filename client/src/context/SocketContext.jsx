@@ -21,7 +21,7 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Create socket connection
-    const socket = io('/', {
+    const socket = io(import.meta.env.VITE_API_URL || '/', {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
