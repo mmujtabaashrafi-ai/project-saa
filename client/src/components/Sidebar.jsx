@@ -236,7 +236,7 @@ export default function Sidebar({
       )}
 
       {/* ─── Conversation List / Search Results ───────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-3 pb-24 md:pb-4 space-y-0.5">
         <AnimatePresence mode="wait">
           {searchMode ? (
             /* Search Results */
@@ -294,7 +294,7 @@ export default function Sidebar({
       </div>
 
       {/* ─── Profile Footer ───────────────────────────────────────────── */}
-      <div className="border-t border-white/5 px-4 py-3 flex items-center gap-3">
+      <div className="border-t border-white/5 px-4 py-3 hidden md:flex items-center gap-3">
         <UserAvatar user={user} size={36} showStatus isOnline />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-white truncate">{user?.displayName}</div>

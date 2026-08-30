@@ -3,10 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Send, Trash2, Loader2, Sparkles, X } from 'lucide-react';
 import { reactBoatApi } from '../services/api';
 import { format } from 'date-fns';
+import WelcomeSabaBanner from './WelcomeSabaBanner';
+import { SABA_QUICK_PROMPTS } from '../data/sabaKnowledge';
 
 // ─── Simple markdown renderer ─────────────────────────────────────────────
 const renderMarkdown = (text) => {
-  let html = text
+  if (!text) return '';
+  let html = String(text)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     // Code blocks
     .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
@@ -18,8 +21,8 @@ const renderMarkdown = (text) => {
     // Italic
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     // Headings
-    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95rem;font-weight:700;margin:8px 0 4px">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 style="font-size:1rem;font-weight:700;margin:8px 0 4px">$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:0.95rem;font-weight:700;margin:8px 0 4px;color:#fbcfe8">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1rem;font-weight:700;margin:8px 0 4px;color:#f472b6">$1</h2>')
     // Lists
     .replace(/^- (.+)$/gm, '<li style="margin:2px 0">$1</li>')
     .replace(/(<li[^>]*>.*<\/li>\s*)+/gs, (m) => `<ul style="padding-left:16px;margin:4px 0">${m}</ul>`)
@@ -42,15 +45,23 @@ const AIMessage = ({ message }) => {
     ? format(new Date(message.timestamp), 'HH:mm')
     : '';
 
+  const messageText =
+    typeof message.content === 'string'
+      ? message.content
+      : message.content?.content
+      ? String(message.content.content)
+      : message.content != null
+      ? String(message.content)
+      : 'I am here to assist you with thoughtful conversation.';
+
   return (
     <div className={`flex items-end gap-2 mb-3 message-appear ${isAI ? 'flex-row' : 'flex-row-reverse'}`}>
       {isAI && (
-        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}>
-          <Bot size={16} className="text-white" />
+        <div className="w-8 h-8 rounded-full overflow-hidden border border-pink-400/50 shadow-md shadow-pink-500/20 bg-slate-900 flex-shrink-0">
+          <img src="/saba_bg.jpg" alt="Saba AI" className="w-full h-full object-cover" />
         </div>
       )}
-      <div className="max-w-[80%]">
+      <div className="max-w-[82%]">
         <div
           className={`px-4 py-3 ${isAI ? 'bubble-ai ai-message' : 'bubble-sent'}`}
           style={{ wordBreak: 'break-word' }}
@@ -58,17 +69,17 @@ const AIMessage = ({ message }) => {
           {isAI ? (
             <div
               className="text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(messageText) }}
             />
           ) : (
             <p className="text-sm leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
-              {message.content}
+              {messageText}
             </p>
           )}
         </div>
         <div className={`text-xs mt-0.5 ${isAI ? 'text-left' : 'text-right'}`}
           style={{ color: 'var(--text-muted)' }}>
-          {timeStr} {isAI && '· React Boat AI'}
+          {timeStr} {isAI && '· Saba AI'}
         </div>
       </div>
     </div>
@@ -78,29 +89,20 @@ const AIMessage = ({ message }) => {
 // ─── Thinking indicator ───────────────────────────────────────────────────
 const ThinkingIndicator = () => (
   <div className="flex items-end gap-2 mb-3">
-    <div className="w-8 h-8 rounded-full flex items-center justify-center"
-      style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}>
-      <Bot size={16} className="text-white" />
+    <div className="w-8 h-8 rounded-full overflow-hidden border border-pink-400/50 shadow-md shadow-pink-500/20 bg-slate-900 flex-shrink-0">
+      <img src="/saba_bg.jpg" alt="Saba AI" className="w-full h-full object-cover" />
     </div>
     <div className="px-4 py-3 bubble-ai">
-      <div className="flex gap-1 items-center">
+      <div className="flex gap-1.5 items-center">
         {[0, 1, 2].map((i) => (
-          <span key={i} className="typing-dot w-2 h-2 rounded-full bg-white/60"
+          <span key={i} className="typing-dot w-2 h-2 rounded-full bg-pink-400/80"
             style={{ animationDelay: `${i * 0.2}s` }} />
         ))}
-        <span className="text-xs text-white/60 ml-1">Thinking…</span>
+        <span className="text-xs text-slate-300 ml-1">Saba AI is reflecting…</span>
       </div>
     </div>
   </div>
 );
-
-// ─── Quick prompts ────────────────────────────────────────────────────────
-const QUICK_PROMPTS = [
-  { icon: '☕', label: 'Java OOP', prompt: 'Explain Java OOP concepts with examples' },
-  { icon: '🐍', label: 'Python Basics', prompt: 'What are the key Python fundamentals I should know?' },
-  { icon: '🧩', label: 'DSA Tips', prompt: 'Give me a DSA study roadmap and key algorithms to learn' },
-  { icon: '🤖', label: 'AI/ML Intro', prompt: 'How do I get started with machine learning?' },
-];
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function ReactBoatChat() {
@@ -143,7 +145,7 @@ export default function ReactBoatChat() {
           data.response ||
           (typeof data.message === 'string' ? data.message : data.message?.content) ||
           data.assistantMessage?.content ||
-          'I am here to assist you!';
+          'I am here to assist you with thoughtful conversation and learning.';
 
         setMessages((prev) => [
           ...prev,
@@ -157,7 +159,7 @@ export default function ReactBoatChat() {
         ...prev,
         {
           role: 'assistant',
-          content: 'Sorry, I encountered an error. Please try again.',
+          content: "I'm currently in development mode, but I can still help with Saba's World, programming, learning and thoughtful conversations. 🌸",
           timestamp: new Date(),
         },
       ]);
@@ -187,23 +189,23 @@ export default function ReactBoatChat() {
       {/* ─── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]"
         style={{ background: 'var(--bg-card)' }}>
-        <div className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}>
-          <Bot size={22} className="text-white" />
+        <div className="w-10 h-10 rounded-full overflow-hidden border border-pink-400/50 shadow-md shadow-pink-500/20 bg-slate-900">
+          <img src="/saba_bg.jpg" alt="Saba AI" className="w-full h-full object-cover" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-[var(--text-primary)]">Saba's World</span>
-            <span className="text-xs px-2 py-0.5 rounded-full text-white"
+            <span className="font-semibold text-[var(--text-primary)]">Saba's World AI</span>
+            <span className="text-xs px-2 py-0.5 rounded-full text-white font-bold"
               style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}>
               AI ✨
             </span>
           </div>
-          <div className="text-xs text-green-500">● Online · AI Assistant</div>
+          <div className="text-xs text-emerald-400 font-medium">● Online · Personal Assistant</div>
         </div>
         {messages.length > 0 && (
           <button onClick={clearHistory}
-            className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-red-400 transition-colors">
+            className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-red-400 transition-colors"
+            title="Clear Chat History">
             <Trash2 size={16} />
           </button>
         )}
@@ -213,44 +215,44 @@ export default function ReactBoatChat() {
       <div className="flex-1 overflow-y-auto py-4 px-4">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={20} className="animate-spin text-[var(--text-muted)]" />
+            <Loader2 size={20} className="animate-spin text-pink-400" />
           </div>
         ) : messages.length === 0 ? (
           /* Welcome screen */
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center h-full gap-6"
+            className="flex flex-col items-center justify-center min-h-full py-6 gap-6 max-w-xl mx-auto"
           >
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-pink-500/20"
-                style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}>
-                <Sparkles size={36} className="text-white" />
-              </div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Saba's World AI ✨</h2>
-              <p className="text-[var(--text-muted)] text-sm mt-1">
-                Your intelligent, kind & thoughtful assistant
-              </p>
-            </div>
+            <WelcomeSabaBanner />
 
             {/* Quick prompts */}
-            <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
-              {QUICK_PROMPTS.map((qp) => (
-                <motion.button
-                  key={qp.label}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => sendMessage(qp.prompt)}
-                  className="p-3 rounded-xl text-left transition-all"
-                  style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  <div className="text-lg mb-1">{qp.icon}</div>
-                  <div className="text-xs font-medium text-[var(--text-primary)]">{qp.label}</div>
-                </motion.button>
-              ))}
+            <div className="w-full">
+              <div className="text-xs font-semibold uppercase tracking-wider text-pink-300/80 mb-2.5 text-center flex items-center justify-center gap-1.5">
+                <Sparkles size={13} className="text-pink-400" />
+                <span>Quick Prompts</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                {SABA_QUICK_PROMPTS.map((qp) => (
+                  <motion.button
+                    key={qp.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => sendMessage(qp.prompt)}
+                    className="p-3 rounded-2xl text-left transition-all flex items-center gap-3 glass-card hover:border-pink-500/40 hover:bg-pink-500/10"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <div className="text-lg p-2 rounded-xl bg-pink-500/10 border border-pink-500/20 flex-shrink-0">{qp.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-[var(--text-primary)] group-hover:text-pink-200">{qp.label}</div>
+                      <div className="text-[11px] text-[var(--text-muted)] line-clamp-1">{qp.description}</div>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
             </div>
           </motion.div>
         ) : (
@@ -265,18 +267,18 @@ export default function ReactBoatChat() {
       </div>
 
       {/* ─── Input ───────────────────────────────────────────────────── */}
-      <div className="px-4 py-3 border-t border-[var(--border)]"
+      <div className="px-3 sm:px-4 py-2.5 sm:py-3 pb-20 md:pb-3 border-t border-[var(--border)]"
         style={{ background: 'var(--bg-card)' }}>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-2 sm:gap-3">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask React Boat anything…"
+            placeholder="Ask Saba AI anything… (Shift+Enter for new line)"
             rows={1}
             disabled={thinking}
-            className="flex-1 resize-none rounded-xl px-4 py-3 text-sm outline-none transition-all disabled:opacity-60"
+            className="flex-1 resize-none rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm outline-none transition-all disabled:opacity-60"
             style={{
               background: 'var(--bg-secondary)',
               border: '1px solid var(--border)',
@@ -293,19 +295,19 @@ export default function ReactBoatChat() {
             disabled={!input.trim() || thinking}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all shadow-md"
             style={{
               background: input.trim() && !thinking
-                ? 'linear-gradient(135deg, #7c3aed, #4f46e5)'
+                ? 'linear-gradient(135deg, #ec4899, #8b5cf6)'
                 : 'var(--bg-secondary)',
               color: input.trim() && !thinking ? 'white' : 'var(--text-muted)',
             }}
           >
-            {thinking ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            {thinking ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} />}
           </motion.button>
         </div>
-        <p className="text-xs mt-1.5 text-center" style={{ color: 'var(--text-muted)' }}>
-          Powered by React Boat AI · {import.meta.env.PROD ? '' : 'Development Mode'}
+        <p className="text-[10px] sm:text-xs mt-1.5 text-center hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+          Saba's World AI · Thoughtful, respectful & private assistance
         </p>
       </div>
     </div>

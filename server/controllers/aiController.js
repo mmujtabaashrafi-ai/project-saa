@@ -34,13 +34,18 @@ const chat = async (req, res) => {
       });
     }
 
-    // Load recent conversation history (last 15 messages)
+    // Load recent conversation history (last 30 messages in chronological order)
     const recentMessages = await AIMessage.find({
       conversationId: activeConversation._id,
     })
-      .sort({ createdAt: 1 })
-      .limit(15)
+      .sort({ createdAt: -1 })
+      .limit(30)
       .lean();
+
+    const chronologicalHistory = recentMessages.reverse().map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
 
     // 1. Save user message to DB
     const userMsgDoc = await AIMessage.create({
@@ -53,22 +58,28 @@ const chat = async (req, res) => {
     // 2. Generate AI response via Service (RAG + Memory + LLM/Fallback)
     const aiResult = await generateAIResponse({
       userId,
+      userName: req.user?.displayName || req.user?.username || null,
       message: message.trim(),
-      history: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+      history: chronologicalHistory,
     });
+
+    const safeContent =
+      (aiResult && typeof aiResult.content === 'string' && aiResult.content.trim())
+        ? aiResult.content.trim()
+        : 'I am ready to assist you!';
 
     // 3. Save assistant message to DB
     const assistantMsgDoc = await AIMessage.create({
       conversationId: activeConversation._id,
       userId,
       role: 'assistant',
-      content: aiResult.content,
-      contextSources: aiResult.contextSources || [],
+      content: safeContent,
+      contextSources: aiResult?.contextSources || [],
     });
 
     // 4. Update conversation metadata
     activeConversation.lastMessage = {
-      text: aiResult.content.slice(0, 80),
+      text: safeContent.slice(0, 80),
       role: 'assistant',
       timestamp: new Date(),
     };
@@ -78,8 +89,8 @@ const chat = async (req, res) => {
     const assistantPayload = {
       _id: assistantMsgDoc._id,
       role: 'assistant',
-      content: aiResult.content || 'I am ready to assist you.',
-      contextSources: aiResult.contextSources || [],
+      content: safeContent,
+      contextSources: aiResult?.contextSources || [],
       createdAt: assistantMsgDoc.createdAt,
     };
 
@@ -89,8 +100,8 @@ const chat = async (req, res) => {
       userMessage: userMsgDoc,
       assistantMessage: assistantPayload,
       message: assistantPayload,
-      response: aiResult.content || 'I am ready to assist you.',
-      memoryExtracted: aiResult.memoryExtracted || 0,
+      response: safeContent,
+      memoryExtracted: aiResult?.memoryExtracted || 0,
     });
   } catch (err) {
     console.error('[AIController chat]', err);

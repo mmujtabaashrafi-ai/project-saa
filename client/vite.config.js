@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true, // expose on local network so phone can connect
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

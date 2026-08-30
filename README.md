@@ -117,7 +117,7 @@ cd server
 npm run seed
 ```
 
-This will automatically create all 22 accounts with bcrypt-hashed passwords (salt rounds = 12).
+This will automatically create the core accounts with bcrypt-hashed passwords (salt rounds = 12).
 
 ### 5. Start Development Servers
 From root directory:
@@ -130,25 +130,19 @@ Or separately:
 
 ---
 
-## 👥 Predefined Accounts
+## 👥 Authentic Core Accounts
 
 ### 👑 Admin Account
-- **Username**: `mohammed.mujtaba`
+- **Username**: `mohammed.mujtaba` (aliases: `mujtaba`)
 - **Display Name**: `Mohammed Mujtaba`
-- **Password**: `mujjubhi143`
+- **Password**: `MUJTABA.26`
 - **Role**: `admin` (Full dashboard access, session control, user activation/deactivation)
 
 ### 🌸 Saba Account
-- **Username**: `saba.the.purest.women`
-- **Display Name**: `Saba the Purest Women`
-- **Password**: `sabathepurestlady`
-- **Role**: `user` (Special dignified profile with modesty quotes and illustrated avatar)
-
-### 👤 Standard Users (20 Accounts)
-- **Usernames**: `user03`, `user04`, ..., `user22`
-- **Display Names**: `User 03`, `User 04`, ..., `User 22`
-- **Default Password**: `ReactBoat@2024`
-- **Role**: `user`
+- **Username**: `saba` (alias: `saba.the.purest.women`)
+- **Display Name**: `Saba`
+- **Password**: `saba.26`
+- **Role**: `user` (Dignified profile with modest quotes and illustrated avatar)
 
 ---
 

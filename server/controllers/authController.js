@@ -33,14 +33,16 @@ const login = async (req, res) => {
 
     const loginIdentifier = username.toLowerCase().trim();
 
-    // Find user with passwordHash (support username, legacy username, or admin email)
+    // Find user with passwordHash (support username, saba alias, or admin aliases)
+    const isSabaAlias = ['saba', 'saba.the.purest.women', 'sabathepurestwomen'].includes(loginIdentifier);
+    const isAdminAlias = ['mmujtabaashrafi@gmail.com', 'mohammed.mujtaba', 'mujtaba'].includes(loginIdentifier);
+
     const user = await User.findOne({
       $or: [
         { username: loginIdentifier },
-        ...( ['mmujtabaashrafi@gmail.com', 'mohammed.mujtaba', 'mujtaba'].includes(loginIdentifier)
-          ? [{ username: 'mujtaba' }, { role: 'admin' }]
-          : [] )
-      ]
+        ...(isSabaAlias ? [{ username: 'saba' }, { username: 'saba.the.purest.women' }] : []),
+        ...(isAdminAlias ? [{ username: 'mohammed.mujtaba' }, { username: 'mujtaba' }, { role: 'admin' }] : []),
+      ],
     }).select('+passwordHash');
 
     if (!user) {
@@ -57,28 +59,18 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid username or password. Please try again.' });
     }
 
-    // ─── 5-Session Limit ────────────────────────────────────────────────
-    // First: check if this user already has an active session (re-login)
-    const existingSession = await Session.findOne({
-      userId: user._id,
-      isActive: true,
-      expiresAt: { $gt: new Date() },
-    });
+    // Invalidate previous sessions for this user before creating a new one
+    await Session.updateMany({ userId: user._id, isActive: true }, { $set: { isActive: false } });
 
-    if (!existingSession) {
-      // User doesn't have an active session → check global limit
-      const activeCount = await countActiveSessions();
-      if (activeCount >= MAX_ACTIVE_USERS) {
-        return res.status(403).json({
-          success: false,
-          message: `All ${MAX_ACTIVE_USERS} active spaces are currently occupied. Please try again later.`,
-          code: 'SESSION_LIMIT_REACHED',
-        });
+    // Check active session count against global limit
+    const activeCount = await countActiveSessions();
+    if (activeCount >= MAX_ACTIVE_USERS) {
+      // Invalidate oldest session if needed or enforce limit
+      const oldestSession = await Session.findOne({ isActive: true }).sort({ lastActivity: 1 });
+      if (oldestSession) {
+        oldestSession.isActive = false;
+        await oldestSession.save();
       }
-    } else {
-      // Invalidate old session before creating new one
-      existingSession.isActive = false;
-      await existingSession.save();
     }
 
     // Create new session

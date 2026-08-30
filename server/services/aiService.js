@@ -2,21 +2,57 @@
 
 const AIMemory = require('../models/AIMemory');
 const { retrieveKnowledge } = require('./knowledgeService');
+const { findSabaResponse, SABA_QUOTES, WHO_IS_SABA_ANSWER } = require('../data/sabaKnowledge');
+const { buildSystemPrompt, BASE_SYSTEM_PROMPT } = require('../config/systemPrompt');
 
-// ─── Base System Persona ───────────────────────────────────────────────────
-const BASE_SYSTEM_PROMPT = `You are Saba's World AI, a fictional personal AI assistant in the Saba's World platform.
-You are helpful, respectful, calm, intelligent, and supportive.
-You have access to curated knowledge provided for this application and deep technical/computer science knowledge.
+// ─── Clean & Format Conversation History for Providers ──────────────────────
+/**
+ * Normalizes multi-turn message history into a strictly alternating sequence of user/assistant turns.
+ * Guarantees provider compatibility (Anthropic, OpenAI, Gemini).
+ */
+const formatConversationHistory = (history = [], currentMessage = '') => {
+  const normalized = [];
 
-Important boundaries:
-- You are NOT the real Saba and must NEVER claim to be a real living person.
-- Clearly present yourself as "Saba's World AI" when asked about your identity.
-- When discussing Saba-specific topics or values, strictly use the curated knowledge provided in your context.
-- For technical and programming questions (Java, Python, C++, JavaScript, DSA, OS, DBMS, AI/ML, System Design), provide clear, production-grade code, step-by-step explanations, and best practices.
-- Adapt your explanations to the user's level. Be encouraging, concise, and structured with markdown formatting.`;
+  for (const item of history) {
+    if (!item) continue;
+    const role = item.role === 'assistant' || item.role === 'model' ? 'assistant' : 'user';
+    const content =
+      typeof item.content === 'string'
+        ? item.content.trim()
+        : String(item.content || '').trim();
+
+    if (!content) continue;
+
+    // Merge consecutive identical roles to enforce strict turn alternation
+    if (normalized.length > 0 && normalized[normalized.length - 1].role === role) {
+      normalized[normalized.length - 1].content += `\n\n${content}`;
+    } else {
+      normalized.push({ role, content });
+    }
+  }
+
+  // Ensure first message starts with 'user' role
+  while (normalized.length > 0 && normalized[0].role !== 'user') {
+    normalized.shift();
+  }
+
+  // Append current user message
+  const trimmedCurr = (currentMessage || '').trim();
+  if (trimmedCurr) {
+    if (normalized.length > 0 && normalized[normalized.length - 1].role === 'user') {
+      if (normalized[normalized.length - 1].content !== trimmedCurr) {
+        normalized[normalized.length - 1].content += `\n\n${trimmedCurr}`;
+      }
+    } else {
+      normalized.push({ role: 'user', content: trimmedCurr });
+    }
+  }
+
+  return normalized;
+};
 
 // ─── Build Augmented Prompt with RAG & Memory ──────────────────────────────
-const buildPromptContext = async (userId, userMessage, history = []) => {
+const buildPromptContext = async (userId, userMessage, history = [], userName = null) => {
   // 1. Retrieve Knowledge
   const retrievedSnippets = await retrieveKnowledge(userMessage, null, 3);
 
@@ -25,28 +61,31 @@ const buildPromptContext = async (userId, userMessage, history = []) => {
   try {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
-      userMemories = await AIMemory.find({ userId }).limit(10).lean();
+      userMemories = await AIMemory.find({ userId }).sort({ updatedAt: -1 }).limit(20).lean();
     }
   } catch (err) {
     console.warn('[AIService] Memory lookup error:', err.message);
   }
 
-  // 3. Construct System Context
-  let augmentedSystemPrompt = BASE_SYSTEM_PROMPT;
-
-  if (retrievedSnippets.length > 0) {
-    augmentedSystemPrompt += '\n\n### CURATED KNOWLEDGE & GROUNDING CONTEXT:';
-    retrievedSnippets.forEach((s, idx) => {
-      augmentedSystemPrompt += `\n[Doc ${idx + 1}: ${s.title} (${s.category})]\n${s.content}`;
-    });
+  // 3. Retrieve pending todos for daily context
+  let pendingTodos = [];
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1 && userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const Todo = require('../models/Todo');
+      pendingTodos = await Todo.find({ userId, completed: false }).sort({ priority: -1 }).limit(5).lean();
+    }
+  } catch (err) {
+    console.warn('[AIService] Todo lookup error:', err.message);
   }
 
-  if (userMemories.length > 0) {
-    augmentedSystemPrompt += '\n\n### USER PREFERENCES & REMEMBERED FACTS:';
-    userMemories.forEach((m) => {
-      augmentedSystemPrompt += `\n- ${m.key}: ${m.value}`;
-    });
-  }
+  // 4. Construct System Context via centralized systemPrompt builder
+  const augmentedSystemPrompt = buildSystemPrompt({
+    userName,
+    pendingTodos,
+    retrievedSnippets,
+    userMemories,
+  });
 
   return {
     systemPrompt: augmentedSystemPrompt,
@@ -114,36 +153,38 @@ const extractAndSaveMemory = async (userId, userMessage) => {
 const generateSmartFallback = (message, snippets = [], memories = []) => {
   const lower = (message || '').toLowerCase().trim();
 
-  // If direct knowledge snippet matches exist, synthesize a detailed response from them
-  if (snippets.length > 0) {
-    const topDoc = snippets[0];
-    return `### 💡 ${topDoc.title}
-
-${topDoc.content}
-
----
-*Generated by Saba's World AI Knowledge Engine. Ask me to dive deeper into any of these concepts!*`;
+  // 1. Direct Saba knowledge / quick prompt match
+  const sabaDirectReply = findSabaResponse(message);
+  if (sabaDirectReply) {
+    return sabaDirectReply;
   }
 
-  // Common greetings
-  if (/^(hi|hello|hey|salaam|assalam|greetings)/i.test(lower)) {
-    return `Hello! ✨ I am **Saba's World AI**, your personal assistant for technology, learning, and thoughtful conversation.
+  // 2. If direct knowledge snippet matches exist, synthesize a detailed response from them
+  if (snippets.length > 0) {
+    const topDoc = snippets[0];
+    return `### 💡 ${topDoc.title}\n\n${topDoc.content}\n\n---\n*Generated by Saba's World AI Knowledge Engine. Ask me to dive deeper into any of these concepts!*`;
+  }
 
-How can I help you today?
+  // 3. Common greetings
+  if (/^(hi|hello|hey|salaam|assalam|greetings)/i.test(lower)) {
+    return `Hello! ✨ I am **Saba's World AI**, your private personal assistant for thoughtful conversation, learning, and inspiration.
+
+How can I assist you today?
+- 🌸 **Saba's World**: Reflections on character, modesty, hijab, and grace
 - ☕ **Programming**: Java, Python, C++, JavaScript & TypeScript
 - 🧩 **DSA & CS**: Data structures, algorithms, DBMS, OS, Networks
 - 🤖 **AI & ML**: Neural networks, LLMs, Transformers, RAG architecture
-- 📖 **Inspiration & Quotes**: Uplifting reflections on character & growth`;
+- 📖 **Inspiration & Quotes**: Uplifting thoughts for personal growth`;
   }
 
-  // Identity query
+  // 4. Identity query
   if (lower.includes('who are you') || lower.includes('your name') || lower.includes('real saba')) {
-    return `I am **Saba's World AI**, an intelligent, kind, and supportive fictional AI personal assistant created for the Saba's World platform.
+    return `I am **Saba's World AI**, a private, respectful, and intelligent personal assistant dedicated to Saba's World.
 
-I am not the real Saba, but I reflect the platform's core values: purity of character, dedication to knowledge, humility, and positive growth. Let me know how I can assist your learning and projects!`;
+I reflect the core values of dignity, character, modesty, and lifelong learning. I am here to help with your questions, studies, and thoughtful reflections.`;
   }
 
-  // Java queries
+  // 5. Java queries
   if (lower.includes('java') || lower.includes('spring') || lower.includes('jvm')) {
     return `### ☕ Java & OOP Architecture
 
@@ -167,7 +208,7 @@ public record UserProfile(String id, String displayName, String role) {
 Would you like to explore Java Streams, Multithreading, or Spring Boot REST APIs? 🚀`;
   }
 
-  // DBMS queries
+  // 6. DBMS queries
   if (lower.includes('dbms') || lower.includes('database') || lower.includes('sql') || lower.includes('nosql')) {
     return `### 🗄️ Database Management Systems (DBMS) in Simple Words
 
@@ -189,7 +230,7 @@ A **DBMS** is software that stores, manages, and retrieves data securely and eff
 What specific database or query optimization would you like to explore?`;
   }
 
-  // Python queries
+  // 7. Python queries
   if (lower.includes('python') || lower.includes('fastapi') || lower.includes('django')) {
     return `### 🐍 Python Mastery & Best Practices
 
@@ -214,7 +255,7 @@ print(assistant.summarize(["DSA", "Machine Learning", "System Design"]))
 What specific Python topic or library are you working on?`;
   }
 
-  // DSA queries
+  // 8. DSA queries
   if (lower.includes('dsa') || lower.includes('binary tree') || lower.includes('graph') || lower.includes('algorithm') || lower.includes('sorting')) {
     return `### 🧩 Data Structures & Algorithms Roadmap
 
@@ -234,7 +275,7 @@ What specific Python topic or library are you working on?`;
 Share your specific problem or code snippet, and I'll help you optimize it step-by-step!`;
   }
 
-  // Operating Systems
+  // 9. Operating Systems
   if (lower.includes('os') || lower.includes('operating system') || lower.includes('deadlock') || lower.includes('thread')) {
     return `### ⚙️ Operating Systems & System Architecture
 
@@ -255,13 +296,13 @@ Share your specific problem or code snippet, and I'll help you optimize it step-
   // Default response
   return `### ✨ Saba's World AI Assistant
 
-Thank you for your question! I am here to help you learn and build:
-- **Code Generation & Debugging** (Java, Python, C++, JavaScript, TypeScript)
-- **Computer Science Fundamentals** (DSA, DBMS, OS, Computer Networks)
-- **Artificial Intelligence** (Machine Learning, Deep Learning, LLMs, RAG)
-- **Study Plans & Technical Guidance**
+I'm currently in development mode, but I can still help with Saba's World, programming, learning and thoughtful conversations.
 
-Tell me what specific concept or problem you're tackling, and I will provide a step-by-step breakdown!`;
+What would you like to explore today?
+- **Saba's World & Wisdom**: Reflections on modesty, character, dignity, and grace
+- **Programming**: Java, Python, C++, JavaScript & TypeScript
+- **Computer Science**: DSA, DBMS, OS, Computer Networks, and AI
+- **Daily Inspiration**: Uplifting messages on personal growth`;
 };
 
 // ─── OpenAI Provider (using native fetch) ──────────────────────────────────
@@ -269,13 +310,11 @@ const callOpenAI = async (systemPrompt, userMessage, history = []) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
+  // Full conversation history + system prompt
+  const formattedHistory = formatConversationHistory(history, userMessage);
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...history.slice(-15).map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content || '',
-    })),
-    { role: 'user', content: userMessage },
+    ...formattedHistory,
   ];
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -309,16 +348,12 @@ const callGemini = async (systemPrompt, userMessage, history = []) => {
   const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const contents = [
-    ...history.slice(-15).map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content || '' }],
-    })),
-    {
-      role: 'user',
-      parts: [{ text: userMessage }],
-    },
-  ];
+  // Map history to Gemini format ({ role: 'user' | 'model', parts: [{ text }] })
+  const formattedHistory = formatConversationHistory(history, userMessage);
+  const contents = formattedHistory.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
 
   const body = {
     contents,
@@ -352,13 +387,8 @@ const callAnthropic = async (systemPrompt, userMessage, history = []) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
 
-  const messages = [
-    ...history.slice(-15).map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content || '',
-    })),
-    { role: 'user', content: userMessage },
-  ];
+  // Format history with strict user/assistant turn alternation
+  const messages = formatConversationHistory(history, userMessage);
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -368,7 +398,7 @@ const callAnthropic = async (systemPrompt, userMessage, history = []) => {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
+      model: process.env.ANTHROPIC_MODEL || 'claude-3-5-haiku-20241022',
       max_tokens: 2048,
       system: systemPrompt,
       messages,
@@ -388,16 +418,18 @@ const callAnthropic = async (systemPrompt, userMessage, history = []) => {
 /**
  * generateAIResponse
  * @param {Object} params
- * @param {string} params.userId - Authenticated user ID
- * @param {string} params.message - Current user query
- * @param {Array}  params.history - Previous messages in conversation
- * @returns {Promise<{ content: string, contextSources: Array, memoryExtracted: number }>}
+ * @param {string} params.userId      - Authenticated user ID
+ * @param {string} params.userName    - User's display name (for personalization)
+ * @param {string} params.message     - Current user query
+ * @param {Array}  params.history     - Previous messages in conversation
+ * @returns {Promise<{ content: string, contextSources: Array, memoryExtracted: number, provider: string }>}
  */
-const generateAIResponse = async ({ userId, message, history = [] }) => {
+const generateAIResponse = async ({ userId, userName = null, message, history = [] }) => {
   const { systemPrompt, retrievedSnippets, userMemories } = await buildPromptContext(
     userId,
     message,
-    history
+    history,
+    userName
   );
 
   // Background memory extraction
@@ -408,17 +440,29 @@ const generateAIResponse = async ({ userId, message, history = [] }) => {
     console.warn('[AIService] Memory extraction error:', memErr.message);
   }
 
-  const provider = (process.env.AI_PROVIDER || 'fallback').toLowerCase();
+  // Auto-detect provider: explicit env → key-based fallback chain
+  let provider = (process.env.AI_PROVIDER || 'auto').toLowerCase();
+  if (provider === 'auto' || provider === 'fallback') {
+    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim()) {
+      provider = 'anthropic';
+    } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim()) {
+      provider = 'openai';
+    } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      provider = 'gemini';
+    } else {
+      provider = 'fallback';
+    }
+  }
 
   try {
     let replyText = null;
 
-    if (provider === 'openai' && process.env.OPENAI_API_KEY) {
+    if (provider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+      replyText = await callAnthropic(systemPrompt, message, history);
+    } else if (provider === 'openai' && process.env.OPENAI_API_KEY) {
       replyText = await callOpenAI(systemPrompt, message, history);
     } else if (provider === 'gemini' && process.env.GEMINI_API_KEY) {
       replyText = await callGemini(systemPrompt, message, history);
-    } else if (provider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
-      replyText = await callAnthropic(systemPrompt, message, history);
     }
 
     if (replyText && typeof replyText === 'string' && replyText.trim()) {
@@ -430,6 +474,7 @@ const generateAIResponse = async ({ userId, message, history = [] }) => {
           source: s.source,
         })),
         memoryExtracted,
+        provider,
       };
     }
 
@@ -443,6 +488,7 @@ const generateAIResponse = async ({ userId, message, history = [] }) => {
         source: s.source,
       })),
       memoryExtracted,
+      provider: 'fallback',
     };
   } catch (err) {
     console.error(`[AIService] ${provider} provider failed:`, err.message);
@@ -455,6 +501,7 @@ const generateAIResponse = async ({ userId, message, history = [] }) => {
         source: s.source,
       })),
       memoryExtracted,
+      provider: 'fallback',
     };
   }
 };
@@ -463,4 +510,5 @@ module.exports = {
   generateAIResponse,
   buildPromptContext,
   extractAndSaveMemory,
+  formatConversationHistory,
 };

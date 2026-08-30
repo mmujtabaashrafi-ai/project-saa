@@ -1,30 +1,41 @@
 'use strict';
 
 const AIKnowledge = require('../models/AIKnowledge');
+const { SABA_KNOWLEDGE_TOPICS, SABA_QUOTES } = require('../data/sabaKnowledge');
 
 /**
  * Curated baseline knowledge items to guarantee rich answers even before database population.
  */
 const DEFAULT_KNOWLEDGE_BASE = [
+  ...SABA_KNOWLEDGE_TOPICS,
   {
     category: 'saba_profile',
     title: "Saba's World AI Persona & Identity",
-    content: `Identity: Saba's World AI is an intelligent, kind, calm, supportive, and respectful fictional AI personal assistant.
-Values: Purity of character, lifelong learning, education, dignity, kindness, and positivity.
-Tone: Warm, thoughtful, clear, articulate, encouraging, and intellectually grounded.
-Important: The AI must never claim to be the real Saba or impersonate a living individual. It is the dedicated AI companion of the Saba's World platform.`,
+    content: `Identity: Saba's World AI is a private, elegant, respectful, and intelligent personal assistant dedicated to Saba's World.
+Values: Modesty, character, dignity, lifelong learning, education, kindness, and positivity.
+Tone: Warm, thoughtful, respectful, articulate, and intellectually grounded.
+Important: The AI must never claim to be the real Saba or impersonate a living individual. It is the dedicated AI companion of Saba's World.`,
     tags: ['saba', 'identity', 'persona', 'values', 'assistant', 'who are you'],
   },
   {
     category: 'quotes',
-    title: 'Curated Wisdom & Inspirational Reflections',
+    title: 'Curated Wisdom & Reflections on Saba & Character',
     content: `Selected Reflections & Quotes for Saba's World:
-1. "True beauty is reflected in character, kindness, and dignity."
-2. "Knowledge shared with humility is the purest form of wealth."
-3. "Consistency and clean habits build masterpieces out of ordinary days."
-4. "Keep your heart calm, your code clean, and your intentions pure."
-5. "Growth happens in quiet dedication, not loud declarations."`,
-    tags: ['quotes', 'wisdom', 'inspiration', 'motivation', 'purity'],
+1. "${SABA_QUOTES[0]}"
+2. "${SABA_QUOTES[1]}"
+3. "${SABA_QUOTES[2]}"
+4. "${SABA_QUOTES[3]}"
+5. "${SABA_QUOTES[4]}"
+6. "${SABA_QUOTES[5]}"
+7. "${SABA_QUOTES[6]}"
+8. "${SABA_QUOTES[7]}"
+9. "${SABA_QUOTES[8]}"
+10. "${SABA_QUOTES[9]}"
+11. "${SABA_QUOTES[10]}"
+12. "${SABA_QUOTES[11]}"
+13. "${SABA_QUOTES[12]}"
+14. "${SABA_QUOTES[13]}"`,
+    tags: ['quotes', 'wisdom', 'inspiration', 'motivation', 'modesty', 'hijab', 'character', 'grace'],
   },
   {
     category: 'java',

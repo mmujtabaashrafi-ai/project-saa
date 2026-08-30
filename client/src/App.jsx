@@ -1,20 +1,17 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ThemeProvider } from './context/ThemeContext';
 
 // Pages
 import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import ChatPage from './pages/ChatPage';
+import AIAssistantPage from './pages/AIAssistantPage';
+import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
-import FeedPage from './pages/FeedPage';
-import ExplorePage from './pages/ExplorePage';
-import ReelsPage from './pages/ReelsPage';
-import ProfilePage from './pages/ProfilePage';
-import NotificationsPage from './pages/NotificationsPage';
-import AIAssistantPage from './pages/AIAssistantPage';
 
 // Layout Components
 import Navigation from './components/Navigation';
@@ -55,12 +52,30 @@ const LoadingScreen = () => (
   </div>
 );
 
-// ─── Main App Layout (with Navigation + CallManager) ─────────────────────
-const AppLayout = ({ children }) => (
+// ─── Routes where the bottom nav should be hidden (full-screen pages) ────
+const FULLSCREEN_ROUTES = ['/chat', '/ai', '/admin', '/profile'];
+
+// ─── Home Layout — shows Navigation with bottom bar ──────────────────────
+const HomeLayout = ({ children }) => (
   <SocketProvider>
     <CallManager />
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
-      <Navigation />
+    <div className="flex h-dvh overflow-hidden bg-[var(--bg-primary)]">
+      {/* Desktop sidebar only on home layout */}
+      <Navigation showBottomNav />
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0 md:ml-0">
+        {children}
+      </main>
+    </div>
+  </SocketProvider>
+);
+
+// ─── Full-Screen Layout — hides bottom nav, uses all available space ──────
+const FullScreenLayout = ({ children }) => (
+  <SocketProvider>
+    <CallManager />
+    <div className="flex h-dvh overflow-hidden bg-[var(--bg-primary)]">
+      {/* Desktop sidebar still shown on desktop, no mobile bottom bar */}
+      <Navigation showBottomNav={false} />
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {children}
       </main>
@@ -84,74 +99,38 @@ const AppRoutes = () => (
       }
     />
 
-    {/* Social Feed */}
+    {/* Home Hub — bottom nav visible */}
     <Route
       path="/home"
       element={
         <ProtectedRoute>
-          <AppLayout>
-            <FeedPage />
-          </AppLayout>
+          <HomeLayout>
+            <HomePage />
+          </HomeLayout>
         </ProtectedRoute>
       }
     />
 
-    {/* Explore / Search */}
-    <Route
-      path="/explore"
-      element={
-        <ProtectedRoute>
-          <AppLayout>
-            <ExplorePage />
-          </AppLayout>
-        </ProtectedRoute>
-      }
-    />
-
-    {/* Reels */}
-    <Route
-      path="/reels"
-      element={
-        <ProtectedRoute>
-          <AppLayout>
-            <ReelsPage />
-          </AppLayout>
-        </ProtectedRoute>
-      }
-    />
-
-    {/* Notifications */}
-    <Route
-      path="/notifications"
-      element={
-        <ProtectedRoute>
-          <AppLayout>
-            <NotificationsPage />
-          </AppLayout>
-        </ProtectedRoute>
-      }
-    />
-
-    {/* AI Assistant */}
-    <Route
-      path="/ai"
-      element={
-        <ProtectedRoute>
-          <AppLayout>
-            <AIAssistantPage />
-          </AppLayout>
-        </ProtectedRoute>
-      }
-    />
-
-    {/* Chat (legacy + direct chat) */}
+    {/* Chat — full screen, no bottom nav */}
     <Route
       path="/chat"
       element={
         <ProtectedRoute>
-          <AppLayout>
+          <FullScreenLayout>
             <ChatPage />
-          </AppLayout>
+          </FullScreenLayout>
+        </ProtectedRoute>
+      }
+    />
+
+    {/* AI Assistant — full screen, no bottom nav */}
+    <Route
+      path="/ai"
+      element={
+        <ProtectedRoute>
+          <FullScreenLayout>
+            <AIAssistantPage />
+          </FullScreenLayout>
         </ProtectedRoute>
       }
     />
@@ -161,9 +140,9 @@ const AppRoutes = () => (
       path="/profile"
       element={
         <ProtectedRoute>
-          <AppLayout>
+          <FullScreenLayout>
             <ProfilePage />
-          </AppLayout>
+          </FullScreenLayout>
         </ProtectedRoute>
       }
     />
@@ -173,21 +152,21 @@ const AppRoutes = () => (
       path="/profile/:username"
       element={
         <ProtectedRoute>
-          <AppLayout>
+          <FullScreenLayout>
             <ProfilePage />
-          </AppLayout>
+          </FullScreenLayout>
         </ProtectedRoute>
       }
     />
 
-    {/* Admin */}
+    {/* Admin — full screen, no bottom nav */}
     <Route
       path="/admin"
       element={
         <AdminRoute>
           <SocketProvider>
-            <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
-              <Navigation />
+            <div className="flex h-dvh overflow-hidden bg-[var(--bg-primary)]">
+              <Navigation showBottomNav={false} />
               <main className="flex-1 flex flex-col overflow-hidden min-w-0">
                 <AdminPage />
               </main>
@@ -196,6 +175,12 @@ const AppRoutes = () => (
         </AdminRoute>
       }
     />
+
+    {/* Clean redirects for removed social-media feed routes */}
+    <Route path="/home-feed" element={<Navigate to="/home" replace />} />
+    <Route path="/explore" element={<Navigate to="/home" replace />} />
+    <Route path="/reels" element={<Navigate to="/home" replace />} />
+    <Route path="/notifications" element={<Navigate to="/home" replace />} />
 
     {/* 404 */}
     <Route path="*" element={<NotFoundPage />} />

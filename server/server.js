@@ -25,6 +25,7 @@ const mediaRoutes = require('./routes/media');
 const notificationRoutes = require('./routes/notifications');
 const searchRoutes = require('./routes/search');
 const adminRoutes = require('./routes/admin');
+const todoRoutes = require('./routes/todos');
 
 // ─── App Setup ──────────────────────────────────────────────────────────────
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/react-boat', reactBoatRoutes); // Backwards compatibility
 app.use('/api/admin', adminRoutes);
+app.use('/api/todos', todoRoutes);
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -109,9 +111,11 @@ initSocketHandler(io);
 
 // ─── Start Server ────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
+const { ensureCoreUsersAndData } = require('./seed/seedUsers');
 
 const start = async () => {
   await connectDB();
+  await ensureCoreUsersAndData();
   httpServer.listen(PORT, () => {
     console.log(`\n✨ Saba's World server running on http://localhost:${PORT}`);
     console.log(`   Environment : ${process.env.NODE_ENV || 'development'}`);

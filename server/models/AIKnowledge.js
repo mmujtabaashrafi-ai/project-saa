@@ -8,6 +8,13 @@ const aiKnowledgeSchema = new mongoose.Schema(
       index: true,
       enum: [
         'saba_profile',
+        'who_is_saba',
+        'saba_elegance',
+        'saba_hijab',
+        'saba_quotes',
+        'saba_appreciation',
+        'modesty',
+        'motivation',
         'quotes',
         'values',
         'interests',

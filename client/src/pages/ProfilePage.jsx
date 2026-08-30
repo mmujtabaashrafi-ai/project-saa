@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Grid,
-  Film,
-  Bookmark,
   MessageCircle,
-  Phone,
-  Video,
-  ExternalLink,
+  Bot,
   Shield,
   Loader2,
   Heart,
+  Sparkles,
+  User,
+  Calendar,
+  Lock,
+  Quote,
 } from 'lucide-react';
-import { usersApi, postsApi, reelsApi, conversationsApi } from '../services/api';
+import { usersApi, conversationsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from '../components/UserAvatar';
+import { SABA_QUOTES } from '../data/sabaKnowledge';
 
 export default function ProfilePage() {
   const { username } = useParams();
@@ -26,10 +27,6 @@ export default function ProfilePage() {
   const isOwnProfile = targetUsername === currentUser?.username;
 
   const [profileUser, setProfileUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('posts'); // 'posts' | 'reels' | 'saved'
-  const [userPosts, setUserPosts] = useState([]);
-  const [userReels, setUserReels] = useState([]);
-  const [savedPosts, setSavedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,25 +39,11 @@ export default function ProfilePage() {
         const found = (data.users || []).find((u) => u.username === targetUsername);
         if (found) {
           setProfileUser(found);
-          // Load user posts & reels
-          postsApi.getFeed().then((res) => {
-            if (res.data.success) {
-              setUserPosts(res.data.posts.filter((p) => p.author?.username === targetUsername));
-              if (isOwnProfile) {
-                setSavedPosts(res.data.posts.filter((p) => p.isSaved));
-              }
-            }
-          });
-          reelsApi.getReels().then((res) => {
-            if (res.data.success) {
-              setUserReels(res.data.reels.filter((r) => r.author?.username === targetUsername));
-            }
-          });
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [targetUsername, isOwnProfile]);
+  }, [targetUsername]);
 
   const handleStartChat = async () => {
     if (!profileUser) return;
@@ -87,15 +70,33 @@ export default function ProfilePage() {
       <div className="flex-1 h-screen flex flex-col items-center justify-center bg-[var(--bg-primary)] text-center p-4">
         <h2 className="text-xl font-bold text-white mb-2">User Not Found</h2>
         <p className="text-sm text-slate-400">The profile @{targetUsername} does not exist.</p>
+        <button
+          onClick={() => navigate('/chat')}
+          className="mt-4 px-5 py-2.5 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all"
+        >
+          Return to Chats
+        </button>
       </div>
     );
   }
 
   return (
     <div className="flex-1 h-screen overflow-y-auto bg-[var(--bg-primary)] flex flex-col items-center pb-24 md:pb-12">
-      <div className="w-full max-w-3xl px-4 py-8 space-y-8">
-        {/* ─── Profile Header ─────────────────────────────────────────── */}
-        <div className="p-6 md:p-8 rounded-3xl glass-card border border-white/10 bg-slate-900/90 shadow-2xl flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+      <div className="w-full max-w-3xl px-4 py-8 space-y-6">
+        {/* ─── Profile Card ─────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 md:p-8 rounded-3xl glass-card border border-white/10 bg-slate-900/90 shadow-2xl flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left relative overflow-hidden"
+        >
+          {/* Subtle Ambient Glow */}
+          <div
+            className="absolute top-0 right-0 w-64 h-64 rounded-full pointer-events-none opacity-20 blur-3xl -z-10"
+            style={{
+              background: 'radial-gradient(circle, #ec4899 0%, #8b5cf6 60%, transparent 80%)',
+            }}
+          />
+
           <div className="relative">
             <UserAvatar user={profileUser} size={100} showStatus isOnline={profileUser.isOnline} />
           </div>
@@ -105,27 +106,40 @@ export default function ProfilePage() {
               <div>
                 <h1 className="text-2xl font-black text-white flex items-center justify-center md:justify-start gap-2">
                   {profileUser.displayName}
-                  {profileUser.role === 'admin' && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 flex items-center gap-1 font-bold">
+                  {profileUser.role === 'admin' ? (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 flex items-center gap-1 font-bold">
                       <Shield size={12} />
                       Admin
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30 flex items-center gap-1 font-bold">
+                      <Sparkles size={12} />
+                      Member
                     </span>
                   )}
                 </h1>
                 <p className="text-sm text-slate-400">@{profileUser.username}</p>
               </div>
 
-              {!isOwnProfile && (
-                <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2.5">
+                {!isOwnProfile ? (
                   <button
                     onClick={handleStartChat}
-                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold text-xs shadow-lg flex items-center gap-1.5 transition-all"
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold text-xs shadow-lg flex items-center gap-2 transition-all hover:brightness-110 active:scale-95"
                   >
                     <MessageCircle size={15} />
-                    <span>Message</span>
+                    <span>Direct Message</span>
                   </button>
-                </div>
-              )}
+                ) : (
+                  <button
+                    onClick={() => navigate('/ai')}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold text-xs shadow-lg flex items-center gap-2 transition-all hover:brightness-110 active:scale-95"
+                  >
+                    <Bot size={15} />
+                    <span>Chat with Saba AI</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Bio */}
@@ -135,147 +149,76 @@ export default function ProfilePage() {
               </p>
             )}
 
-            {/* Stats Row */}
-            <div className="flex items-center justify-center md:justify-start gap-6 pt-2 border-t border-white/10 text-sm">
-              <div>
-                <span className="font-extrabold text-white text-base mr-1">
-                  {userPosts.length}
-                </span>
-                <span className="text-slate-400 text-xs font-medium">Posts</span>
+            {/* Account Badges */}
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-3 border-t border-white/10 text-xs text-slate-300">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
+                <Lock size={13} className="text-pink-400" />
+                <span>Private & Encrypted</span>
               </div>
-              <div>
-                <span className="font-extrabold text-white text-base mr-1">
-                  {userReels.length}
-                </span>
-                <span className="text-slate-400 text-xs font-medium">Reels</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
+                <Sparkles size={13} className="text-purple-400" />
+                <span>AI Companion Enabled</span>
               </div>
-              <div>
-                <span className="font-extrabold text-emerald-400 text-xs uppercase font-bold tracking-wider">
-                  Open Social ✨
-                </span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>{profileUser.isOnline ? 'Online Now' : 'Active Account'}</span>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* ─── Profile Tabs ────────────────────────────────────────────── */}
-        <div className="flex items-center justify-center gap-8 border-b border-white/10">
-          <button
-            onClick={() => setActiveTab('posts')}
-            className={`pb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-              activeTab === 'posts'
-                ? 'border-pink-500 text-white'
-                : 'border-transparent text-slate-400 hover:text-white'
-            }`}
+        {/* ─── Words of Grace Reflection Card ─────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-6 rounded-3xl glass-card border border-pink-500/20 bg-slate-900/60 shadow-xl text-left space-y-3"
+        >
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-pink-300">
+            <Quote size={15} className="text-pink-400" />
+            <span>Words of Grace ✨</span>
+          </div>
+          <p className="text-sm sm:text-base text-slate-200 italic leading-relaxed">
+            "{SABA_QUOTES[0]}"
+          </p>
+          <p className="text-xs text-slate-400">
+            A sanctuary built on dignity, modest beauty, and respectful companionship.
+          </p>
+        </motion.div>
+
+        {/* ─── Quick Shortcuts Card ───────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        >
+          <div
+            onClick={() => navigate('/chat')}
+            className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all cursor-pointer group shadow-md"
           >
-            <Grid size={15} />
-            <span>Posts ({userPosts.length})</span>
-          </button>
+            <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400 mb-3 group-hover:scale-105 transition-transform">
+              <MessageCircle size={20} />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1">Direct Messages</h3>
+            <p className="text-xs text-slate-400">
+              Engage in private, real-time conversations with contacts.
+            </p>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('reels')}
-            className={`pb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-              activeTab === 'reels'
-                ? 'border-purple-500 text-white'
-                : 'border-transparent text-slate-400 hover:text-white'
-            }`}
+          <div
+            onClick={() => navigate('/ai')}
+            className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-500/30 hover:bg-purple-500/5 transition-all cursor-pointer group shadow-md"
           >
-            <Film size={15} />
-            <span>Reels ({userReels.length})</span>
-          </button>
-
-          {isOwnProfile && (
-            <button
-              onClick={() => setActiveTab('saved')}
-              className={`pb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-                activeTab === 'saved'
-                  ? 'border-blue-500 text-white'
-                  : 'border-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              <Bookmark size={15} />
-              <span>Saved ({savedPosts.length})</span>
-            </button>
-          )}
-        </div>
-
-        {/* ─── Tab Content ─────────────────────────────────────────────── */}
-        {activeTab === 'posts' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {userPosts.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-slate-400 text-sm">
-                No posts shared yet.
-              </div>
-            ) : (
-              userPosts.map((p) => (
-                <div
-                  key={p._id}
-                  onClick={() => navigate('/home')}
-                  className="aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 relative group cursor-pointer shadow-lg"
-                >
-                  <img
-                    src={p.mediaUrl}
-                    alt="User Post"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white font-bold text-sm">
-                    <span className="flex items-center gap-1">
-                      <Heart size={16} className="fill-white" />
-                      {p.likesCount || 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle size={16} className="fill-white" />
-                      {p.commentsCount || 0}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+              <Bot size={20} />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1">Saba AI Assistant</h3>
+            <p className="text-xs text-slate-400">
+              Explore thoughtful reflections, learn technical topics, and seek inspiration.
+            </p>
           </div>
-        )}
-
-        {activeTab === 'reels' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {userReels.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-slate-400 text-sm">
-                No reels uploaded yet.
-              </div>
-            ) : (
-              userReels.map((r) => (
-                <div
-                  key={r._id}
-                  onClick={() => navigate('/reels')}
-                  className="aspect-[9/16] rounded-2xl overflow-hidden bg-slate-900 border border-white/10 relative group cursor-pointer shadow-lg"
-                >
-                  <video src={r.videoUrl} className="w-full h-full object-cover" />
-                  <div className="absolute bottom-2 left-2 right-2 p-2 bg-black/60 backdrop-blur rounded-xl text-white text-xs truncate">
-                    {r.caption || r.audioTitle}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'saved' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {savedPosts.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-slate-400 text-sm">
-                No saved posts. Save posts from the feed to view them here!
-              </div>
-            ) : (
-              savedPosts.map((p) => (
-                <div
-                  key={p._id}
-                  onClick={() => navigate('/home')}
-                  className="aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 relative group cursor-pointer shadow-lg"
-                >
-                  <img src={p.mediaUrl} alt="Saved" className="w-full h-full object-cover" />
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        </motion.div>
       </div>
     </div>
   );

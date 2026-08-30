@@ -19,11 +19,11 @@ const chat = async (req, res) => {
     }
 
     // Generate AI response
-    const response = await generateResponse(message.trim(), convo.messages);
+    const safeResponse = (await generateResponse(message.trim(), convo.messages)) || 'I am here to assist you!';
 
     // Save both messages
     convo.messages.push({ role: 'user', content: message.trim() });
-    convo.messages.push({ role: 'assistant', content: response });
+    convo.messages.push({ role: 'assistant', content: safeResponse });
 
     // Keep only last 100 messages in DB
     if (convo.messages.length > 100) {
@@ -35,7 +35,12 @@ const chat = async (req, res) => {
 
     res.json({
       success: true,
-      response,
+      response: safeResponse,
+      message: {
+        role: 'assistant',
+        content: safeResponse,
+        timestamp: new Date(),
+      },
       provider: process.env.AI_PROVIDER || 'fallback',
     });
   } catch (err) {

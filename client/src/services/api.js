@@ -21,10 +21,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('rb_token');
-      localStorage.removeItem('rb_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        localStorage.removeItem('rb_token');
+        localStorage.removeItem('rb_user');
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
@@ -147,6 +150,16 @@ export const adminApi = {
   updateUserStatus: (id, isActive) => api.patch(`/admin/users/${id}/status`, { isActive }),
   terminateSession: (id) => api.delete(`/admin/sessions/${id}`),
   logoutAll: () => api.post('/admin/logout-all'),
+};
+
+// ─── Todos & Reminders ────────────────────────────────────────────────────
+export const todosApi = {
+  getAll: (params) => api.get('/todos', { params }),
+  create: (data) => api.post('/todos', data),
+  update: (id, data) => api.patch(`/todos/${id}`, data),
+  delete: (id) => api.delete(`/todos/${id}`),
+  clearCompleted: () => api.delete('/todos/completed'),
+  getDailySummary: () => api.get('/todos/daily-summary'),
 };
 
 export default api;

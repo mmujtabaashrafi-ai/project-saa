@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ConversationPanel from '../components/ConversationPanel';
 import ReactBoatChat from '../components/ReactBoatChat';
+import WelcomeSabaBanner from '../components/WelcomeSabaBanner';
 import { conversationsApi } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +15,7 @@ export default function ChatPage() {
 
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
-  const [isAIActive, setIsAIActive] = useState(false);
+  const [isAIActive, setIsAIActive] = useState(true);
   const [showSidebar, setShowSidebar] = useState(true);
   const [typingUsers, setTypingUsers] = useState(new Map());
 
@@ -35,19 +37,21 @@ export default function ChatPage() {
   useEffect(() => {
     const handleReceive = ({ message, conversationId }) => {
       setConversations((prev) =>
-        prev.map((c) =>
-          c._id === conversationId
-            ? {
-                ...c,
-                lastMessage: {
-                  text: message.text,
-                  sender: message.sender?._id,
-                  timestamp: message.createdAt,
-                },
-                updatedAt: message.createdAt,
-              }
-            : c
-        ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        prev
+          .map((c) =>
+            c._id === conversationId
+              ? {
+                  ...c,
+                  lastMessage: {
+                    text: message.text,
+                    sender: message.sender?._id,
+                    timestamp: message.createdAt,
+                  },
+                  updatedAt: message.createdAt,
+                }
+              : c
+          )
+          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       );
     };
 
@@ -77,35 +81,33 @@ export default function ChatPage() {
   const handleSelectConversation = (conv) => {
     setActiveConversation(conv);
     setIsAIActive(false);
-    setShowSidebar(false); // mobile: hide sidebar
+    setShowSidebar(false); // On phone: switch to conversation view
   };
 
   const handleSelectAI = () => {
     setActiveConversation(null);
     setIsAIActive(true);
-    setShowSidebar(false); // mobile: hide sidebar
+    setShowSidebar(false); // On phone: switch to AI view
   };
 
-  const handleBack = () => {
+  const handleBackToSidebar = () => {
     setShowSidebar(true);
     setActiveConversation(null);
     setIsAIActive(false);
   };
 
-  const isMobile = () => window.innerWidth < 768;
-
   return (
-    <div className="h-screen overflow-hidden flex">
-      {/* ─── Sidebar ────────────────────────────────────────────────── */}
+    <div className="h-dvh w-full overflow-hidden flex flex-col md:flex-row bg-[var(--bg-primary)] pt-12 md:pt-0">
+      {/* ─── Sidebar (Conversations List) ─────────────────────────── */}
       <div
         className={`
-          ${isMobile() && !showSidebar ? 'hidden' : 'flex'}
+          ${!showSidebar ? 'hidden md:flex' : 'flex'}
           flex-col
-          w-full md:w-80 lg:w-[320px]
+          w-full md:w-80 lg:w-[340px]
           flex-shrink-0
-          md:flex
+          border-r border-white/10
+          h-full
         `}
-        style={{ maxWidth: '320px' }}
       >
         <Sidebar
           conversations={conversations}
@@ -118,15 +120,30 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* ─── Main Panel ─────────────────────────────────────────────── */}
+      {/* ─── Main Chat Panel ──────────────────────────────────────── */}
       <div
         className={`
+          ${showSidebar ? 'hidden md:flex' : 'flex'}
           flex-1 min-w-0
-          ${isMobile() && showSidebar ? 'hidden' : 'flex'}
           flex-col
-          md:flex
+          h-full
+          relative
         `}
       >
+        {/* Mobile Top Back Bar when in AI chat */}
+        {isAIActive && (
+          <div className="md:hidden flex items-center justify-between px-3 py-2 bg-slate-900/90 border-b border-white/10 flex-shrink-0">
+            <button
+              onClick={handleBackToSidebar}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 text-slate-300 text-xs font-semibold hover:bg-white/10 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span>Back to chats</span>
+            </button>
+            <span className="text-xs font-bold text-pink-300">Saba AI Hub</span>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {isAIActive ? (
             <motion.div
@@ -134,7 +151,7 @@ export default function ChatPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 h-full"
+              className="flex-1 h-full min-h-0 flex flex-col"
             >
               <ReactBoatChat />
             </motion.div>
@@ -144,11 +161,11 @@ export default function ChatPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 h-full"
+              className="flex-1 h-full min-h-0 flex flex-col"
             >
               <ConversationPanel
                 conversation={activeConversation}
-                onBack={handleBack}
+                onBack={handleBackToSidebar}
               />
             </motion.div>
           ) : (
@@ -157,18 +174,17 @@ export default function ChatPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex items-center justify-center"
+              className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 overflow-y-auto text-center"
               style={{ background: 'var(--bg-secondary)' }}
             >
-              <div className="text-center opacity-50 p-8">
-                <div className="text-6xl mb-4 animate-pulse">✨</div>
-                <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">
-                  Saba's World ✨
-                </h2>
-                <p className="text-[var(--text-muted)] text-sm">
-                  Select a conversation or start chatting with Saba's World AI
-                </p>
-              </div>
+              <WelcomeSabaBanner />
+              <button
+                onClick={() => setIsAIActive(true)}
+                className="mt-6 px-6 py-3 rounded-2xl text-white font-semibold text-xs tracking-wider uppercase flex items-center gap-2 shadow-lg shadow-pink-500/25 hover:brightness-110 active:scale-95 transition-all"
+                style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}
+              >
+                <span>Chat with Saba AI</span>
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

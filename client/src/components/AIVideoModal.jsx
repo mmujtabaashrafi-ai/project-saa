@@ -101,8 +101,12 @@ export default function AIVideoModal({ isOpen, onClose }) {
 
     try {
       const { data } = await aiApi.chat({ message: queryText });
-      if (data.success) {
-        const reply = data.message.content;
+      if (data && data.success) {
+        const rawMsg = data.message || data.assistantMessage || {};
+        const reply =
+          data.response ||
+          (typeof rawMsg === 'string' ? rawMsg : rawMsg.content) ||
+          'Welcome to Saba’s World AI Video Experience! I am your AI assistant.';
         setAiResponse(reply);
         speakText(reply);
       }

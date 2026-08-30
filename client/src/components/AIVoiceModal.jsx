@@ -99,8 +99,12 @@ export default function AIVoiceModal({ isOpen, onClose }) {
 
     try {
       const { data } = await aiApi.chat({ message: queryText });
-      if (data.success) {
-        const reply = data.message.content;
+      if (data && data.success) {
+        const rawMsg = data.message || data.assistantMessage || {};
+        const reply =
+          data.response ||
+          (typeof rawMsg === 'string' ? rawMsg : rawMsg.content) ||
+          'I am here to assist you with thoughtful conversation and learning.';
         setAiResponse(reply);
         speakText(reply);
       }
